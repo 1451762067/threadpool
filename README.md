@@ -9,6 +9,7 @@ linux本身并没有提供线程池的库，因此在github上找到了一个实
 2.pthread_cond_t 条件量  
 3.pthread_t 创建线程的函数  
 
+【解决思路】   
 于是我开始寻找win的代替代码，互斥锁在windows上有critical section可以代替，create_thread在windows上  
 有_beginthread可以代替，唯一没有思路的是pthread_cond_t，pthread_cond_t一般是和互斥锁一起使用解决   
 可能存在的死锁问题，而死锁出现的原因是在获取到互斥锁的线程在进入关键段后陷入等
@@ -20,6 +21,7 @@ linux本身并没有提供线程池的库，因此在github上找到了一个实
 我的思路是：等待队列不为空 -> 加锁 -> 处理 -> 解锁   
 而且等待的过程中要让线程挂起，决不能以某种轮询的方式浪费CPU时间   
 
+【解决办法】   
 经过查阅发现windows的信号量内核对象(Semaphore)配合WaitForSingleObject刚好满足我的要求，思路是这样的，   
 当有新的任务加入队里的时候，调用ReleaseSemaphore让Semaphore自加1，而在WaitForSingleObject(Semaphore)会自减1，   
 如果WaitForSingleObject(Semaphore)时，Semaphore为空，那么调用线程将陷入等待，之后新的任务到来调用
@@ -29,3 +31,6 @@ ReleaseSemaphore才会唤起等待的进程，其中ReleaseSemaphore和WaitForSi
 这个方案的本质其实是，设置一个变量体现任务数，过来一个任务+1，处理一个任务-1，只有任务数不为0的时候，
 才允许线程拿到锁，这个任务数就是Semaphore变量，而ReleaseSemaphore和WaitForSingleObject保证
 了+1和-1的原子性，WaitForSingleObject还解决了等待时的挂起问题，从巧妙地解决了上面提出的问题。  
+
+【测试结果】   
+经测试，运行良好，尚未做过压测，未知瓶颈。
