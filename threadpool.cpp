@@ -242,16 +242,12 @@ void threadpool_thread(void* threadpool)
     threadpool_task_t task;
 
     for (;;) {
-        printf("Before WaitForSingleObject\n");
-
         DWORD dw = WaitForSingleObject(pool->sem, INFINITE);
         if (dw == WAIT_FAILED)
         {
             pool->started--;
             return;
         }
-
-        printf("After WaitForSingleObject\n");
 
         EnterCriticalSection(&(pool->cs));
 
