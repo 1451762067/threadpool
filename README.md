@@ -26,6 +26,6 @@ linux本身并没有提供线程池的库，因此在github上找到了一个实
 ReleaseSemaphore才会唤起等待的进程，其中ReleaseSemaphore和WaitForSingleObject等都是原子操作，
 这保证了不同线程在对Semaphore操作之后结果的正确性，从保证让线程在拿到锁之前，任务队列不为空。   
 
-这个方案的本质其实是，设置一个变量体现任务数，过来一个任务+1，处理一个任务-1，只有任务数不为0的时候，才允许线程拿到锁，   
-这个任务数就是Semaphore变量，而ReleaseSemaphore和WaitForSingleObject保证了+1和-1的原子性，WaitForSingleObject还   
-解决了等待时的挂起问题，从巧妙地解决了上面提出的问题。  
+这个方案的本质其实是，设置一个变量体现任务数，过来一个任务+1，处理一个任务-1，只有任务数不为0的时候，
+才允许线程拿到锁，这个任务数就是Semaphore变量，而ReleaseSemaphore和WaitForSingleObject保证
+了+1和-1的原子性，WaitForSingleObject还解决了等待时的挂起问题，从巧妙地解决了上面提出的问题。  
