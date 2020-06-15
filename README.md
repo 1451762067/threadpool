@@ -14,17 +14,17 @@ linux本身并没有提供线程池的库，因此在github上找到了一个实
 可能存在的死锁问题，而死锁出现的原因是在获取到互斥锁的线程在进入关键段后陷入等
 待（等待其他条件，比如bool的翻转等），只要解决这个等待的问题，那么pthread_cond_t就不是必要的。  
 
-在原来的代码中，等待的原因是，拿到互斥锁之后，任务队列可能为0，于是开始等待新的任务到来，我想可不可以任务队
-列不为零的时候才让线程难道互斥锁：   
+在原来的代码中，等待的原因是，拿到互斥锁之后，任务队列可能为0，于是开始等待新的任务到来，我想可不可以
+任务队列不为零的时候才让线程难道互斥锁：   
 原来的代码逻辑：加锁 -> 队列空 -> 等待 -> 队列不为空 -> 处理 -> 解锁   
 我的思路是：等待队列不为空 -> 加锁 -> 处理 -> 解锁   
 而且等待的过程中要让线程挂起，决不能以某种轮询的方式浪费CPU时间   
 
 经过查阅发现windows的信号量内核对象(Semaphore)配合WaitForSingleObject刚好满足我的要求，思路是这样的，   
 当有新的任务加入队里的时候，调用ReleaseSemaphore让Semaphore自加1，而在WaitForSingleObject(Semaphore)会自减1，   
-如果WaitForSingleObject(Semaphore)时，Semaphore为空，那么调用线程将陷入等待，之后新的任务到来调用了ReleaseSemaphore   
-才会唤起等待的进程，其中ReleaseSemaphore和WaitForSingleObject等都是原子操作，这保证了不同线程在对Semaphore操作之后   
-结果的正确性，从保证让线程在拿到锁之前，任务队列不为空。   
+如果WaitForSingleObject(Semaphore)时，Semaphore为空，那么调用线程将陷入等待，之后新的任务到来调用
+ReleaseSemaphore才会唤起等待的进程，其中ReleaseSemaphore和WaitForSingleObject等都是原子操作，
+这保证了不同线程在对Semaphore操作之后结果的正确性，从保证让线程在拿到锁之前，任务队列不为空。   
 
 这个方案的本质其实是，设置一个变量体现任务数，过来一个任务+1，处理一个任务-1，只有任务数不为0的时候，才允许线程拿到锁，   
 这个任务数就是Semaphore变量，而ReleaseSemaphore和WaitForSingleObject保证了+1和-1的原子性，WaitForSingleObject还   
