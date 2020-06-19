@@ -188,6 +188,7 @@ int threadpool_destroy(threadpool_t* pool, int flags)
         return threadpool_invalid;
     }
 
+
     do {
         EnterCriticalSection(&(pool->cs));
 
@@ -208,9 +209,26 @@ int threadpool_destroy(threadpool_t* pool, int flags)
             }
         }
         else{
-            //shutdown gracefully
-        }
+            ////shutdown gracefully
+            //MSG msg;
+            //switch (MsgWaitForMultipleObjects(pool->thread_count, pool->threads, TRUE, 60*1000, QS_ALLEVENTS))  //等待线程完成
+            //{
+            //case WAIT_FAILED:   //句柄无效
+            //case WAIT_TIMEOUT:  //超时
+            //case WAIT_OBJECT_0: //完成
+            //    break;
+            //case (WAIT_OBJECT_0 + pool->thread_count):
+            //    if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE | PM_QS_INPUT | PM_QS_PAINT | PM_QS_POSTMESSAGE | PM_QS_SENDMESSAGE))   //接收消息
+            //    {
+            //        TranslateMessage(&msg);
+            //        DispatchMessage(&msg);
+            //    }
+            //    continue;
 
+            //default:
+            //    break;
+            //}
+        }
     } while (0);
 
     /* Only if everything went well do we deallocate the pool */
@@ -242,22 +260,27 @@ void threadpool_thread(void* threadpool)
     threadpool_task_t task;
 
     for (;;) {
-        DWORD dw = WaitForSingleObject(pool->sem, INFINITE);
+        DWORD dw = WaitForSingleObject(pool->sem, 10*1000);
         if (dw == WAIT_FAILED)
         {
-            pool->started--;
-            return;
-        }
-
-        EnterCriticalSection(&(pool->cs));
-
-        if ((pool->shutdown == immediate_shutdown) ||
-            ((pool->shutdown == graceful_shutdown) &&
-               pool->count == 0)) {
-            LeaveCriticalSection(&(pool->cs));
             break;
         }
+        else if (dw == WAIT_TIMEOUT)  //超时  pool->count 肯定必为 0
+        { 
+            //immediate_shutdown 不检查，因为线程会被主线程直接terminate
+            printf("WaitForSingleObject 超时\n");
+            EnterCriticalSection(&(pool->cs));
+            if (pool->shutdown == graceful_shutdown)
+            {
+                LeaveCriticalSection(&(pool->cs));
+                break;
+            }
+            LeaveCriticalSection(&(pool->cs));
+            continue;
+        }
 
+        //会运行到下段代码时， pool->count 肯定不为0
+        EnterCriticalSection(&(pool->cs));
         /* Grab our task */
         task.function = pool->queue[pool->head].function;
         task.argument = pool->queue[pool->head].argument;
@@ -271,6 +294,7 @@ void threadpool_thread(void* threadpool)
         (*(task.function))(task.argument);
     }
 
+    printf("线程退出\n");
     pool->started--;
     return;
 }
